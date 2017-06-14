@@ -8,6 +8,7 @@
 
 import UIKit
 
+@objc
 open class AlertContentView: UIView {
     let TextFieldFontSize: CGFloat = 14
     let TextFieldHeight: CGFloat = 25

@@ -15,8 +15,9 @@ class RespondView: UIView {
     }
 }
 
+@objc
 open class AlertController: UIViewController {
-    public enum Style {
+    @objc public enum AlertControllerStyle : Int {
         case alert
         case actionSheet
     }
@@ -53,7 +54,6 @@ open class AlertController: UIViewController {
     
     open fileprivate(set) var actions: [AlertAction] = []
     open fileprivate(set) var textFields: [UITextField] = []
-    open var coverColor = UIColor.black.withAlphaComponent(0.4)
     fileprivate var textFieldHandlers: [((UITextField?) -> Void)?] = []
     fileprivate var customView: UIView?
     fileprivate var transitionCoverView: UIView?
@@ -63,12 +63,13 @@ open class AlertController: UIViewController {
     let AlertButtonHeight: CGFloat = 48
     let AlertButtonFontSize: CGFloat = 17
     let ActionSheetMargin: CGFloat = 8
-    let ActionSheetButtonHeight: CGFloat = 44
-    let ActionSheetButtonFontSize: CGFloat = 21
+    let ActionSheetButtonHeight: CGFloat = 60
+    let ActionSheetButtonFontSize: CGFloat = 20
     let ConstraintPriorityRequired: Float = 1000
     
-    fileprivate var message: String?
-    fileprivate var preferredStyle: Style = .alert
+    fileprivate var topTitle: NSAttributedString?
+    fileprivate var message: NSAttributedString?
+    fileprivate var preferredStyle: AlertControllerStyle = .alert
     
     fileprivate var marginInsets: UIEdgeInsets {
         set {
@@ -94,14 +95,14 @@ open class AlertController: UIViewController {
         self.init(nibName: "SimpleAlert", bundle: Bundle(for: AlertController.self))
     }
     
-    public convenience init(title: String?, message: String?, style: Style) {
+    public convenience init(title: NSAttributedString?, message: NSAttributedString?, style: AlertControllerStyle) {
         self.init()
-        self.title = title
+        self.topTitle = title
         self.message = message
         self.preferredStyle = style
     }
     
-    public convenience init(view: UIView?, style: Style) {
+    public convenience init(view: UIView?, style: AlertControllerStyle) {
         self.init()
         self.customView = view
         self.preferredStyle = style
@@ -127,10 +128,10 @@ open class AlertController: UIViewController {
         
         view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         
-        baseView.layer.cornerRadius = 3.0
+        baseView.layer.cornerRadius = 10.0
         baseView.clipsToBounds = true
         
-        cancelButtonView.layer.cornerRadius = 3.0
+        cancelButtonView.layer.cornerRadius = 10.0
         cancelButtonView.clipsToBounds = true
         
         displayTargetView = contentView
@@ -228,10 +229,19 @@ open class AlertController: UIViewController {
         let button = loadButton()
         if button.bounds.height <= 0 {
             button.frame.size.height = buttonHeight
+            button.frame.size.width = 300
         }
+        let label = loadLabel()
         button.autoresizingMask = .flexibleWidth
         button.addTarget(self, action: #selector(AlertController.buttonWasTapped(_:)), for: .touchUpInside)
+        button.addSubview(label)
+        var rect = button.bounds
+        rect.origin.x = 10
+        rect.size.width -= 20
+        label.frame = rect
+        label.autoresizingMask = [.flexibleWidth, .flexibleRightMargin, .flexibleLeftMargin, .flexibleHeight]
         action.setButton(button)
+        action.setLabel(label)
         configureButton(action.style, forButton: button)
         actions.append(action)
     }
@@ -244,10 +254,27 @@ open class AlertController: UIViewController {
         borderView.autoresizingMask = .flexibleWidth
         button.addSubview(borderView)
         
+        let rect = CGRect(x: 0, y: 0, width: 10, height: 10)
+        UIGraphicsBeginImageContextWithOptions(CGSize(width: 10, height: 10), false, 0)
+        let color = UIColor.lightGray
+        color.setFill()
+        UIRectFill(rect)
+        let image: UIImage = UIGraphicsGetImageFromCurrentImageContext()!
+        UIGraphicsEndImageContext()
+        
+        button.setBackgroundImage(image, for: .highlighted)
+        button.setBackgroundImage(image, for: .selected)
+        
         return button
     }
     
-    open func configureButton(_ style: AlertAction.Style, forButton button: UIButton) {
+    open func loadLabel() -> UILabel {
+        let label = UILabel()
+        label.tag = 1001
+        return label
+    }
+    
+    open func configureButton(_ style: AlertAction.AlertActionStyle, forButton button: UIButton) {
         if preferredStyle == .alert {
             configurAlertButton(style, forButton: button)
         } else {
@@ -321,8 +348,8 @@ private extension AlertController {
     func setupContnetView() {
         takeOverColor(contentView)
         
-        contentView?.titleLabel.text = title
-        contentView?.messageLabel.text = message
+        contentView?.titleLabel.attributedText = topTitle
+        contentView?.messageLabel.attributedText = message
         
         if preferredStyle == .alert {
             for handler in textFieldHandlers {
@@ -441,27 +468,46 @@ private extension AlertController {
         }
     }
     
-    func configurAlertButton(_ style :AlertAction.Style, forButton button: UIButton) {
+    func configurAlertButton(_ style :AlertAction.AlertActionStyle, forButton button: UIButton) {
+        let titleLabel = button.viewWithTag(1001) as! UILabel
         switch style {
         case .destructive:
-            button.setTitleColor(UIColor.red, for: UIControlState())
-            button.titleLabel?.font = UIFont.systemFont(ofSize: AlertButtonFontSize)
+            titleLabel.textAlignment = .center
+            titleLabel.textColor = .red
+            titleLabel.font = UIFont.systemFont(ofSize: AlertButtonFontSize)
         case .cancel:
-            button.titleLabel?.font = UIFont.boldSystemFont(ofSize: AlertButtonFontSize)
+            titleLabel.textAlignment = .center
+            titleLabel.textColor = button.titleColor(for: .normal)
+            titleLabel.font = UIFont.boldSystemFont(ofSize: AlertButtonFontSize)
         default:
-            button.titleLabel?.font = UIFont.systemFont(ofSize: AlertButtonFontSize)
+            titleLabel.textAlignment = .center
+            titleLabel.textColor = button.titleColor(for: .normal)
+            titleLabel.font = UIFont.systemFont(ofSize: AlertButtonFontSize)
         }
     }
     
-    func configurActionSheetButton(_ style :AlertAction.Style, forButton button: UIButton) {
+    func configurActionSheetButton(_ style :AlertAction.AlertActionStyle, forButton button: UIButton) {
+        let titleLabel = button.viewWithTag(1001) as! UILabel
         switch style {
         case .destructive:
-            button.setTitleColor(UIColor.red, for: UIControlState())
-            button.titleLabel?.font = UIFont.systemFont(ofSize: ActionSheetButtonFontSize)
+            titleLabel.textColor = .red
+            titleLabel.textAlignment = .center
+            titleLabel.font = UIFont.systemFont(ofSize: ActionSheetButtonFontSize)
         case .cancel:
-            button.titleLabel?.font = UIFont.boldSystemFont(ofSize: ActionSheetButtonFontSize)
+            titleLabel.textColor = button.titleColor(for: .normal)
+            titleLabel.textAlignment = .center
+            titleLabel.font = UIFont.boldSystemFont(ofSize: ActionSheetButtonFontSize)
+        case .twolines:
+            titleLabel.textColor = button.titleColor(for: .normal)
+            titleLabel.font = UIFont.systemFont(ofSize: 16)
+            titleLabel.numberOfLines = 2
+            titleLabel.textAlignment = .left
+            titleLabel.adjustsFontSizeToFitWidth = false
+            titleLabel.lineBreakMode = .byTruncatingTail
         default:
-            button.titleLabel?.font = UIFont.systemFont(ofSize: ActionSheetButtonFontSize)
+            titleLabel.textAlignment = .center
+            titleLabel.textColor = button.titleColor(for: .normal)
+            titleLabel.font = UIFont.systemFont(ofSize: ActionSheetButtonFontSize)
         }
     }
     
@@ -491,6 +537,7 @@ private extension AlertController {
 // MARK: - Action Methods
 private extension AlertController {
     dynamic func buttonWasTapped(_ sender: UIButton) {
+        sender.setBackgroundImage(sender.backgroundImage(for: .highlighted), for: .normal)
         dismissViewController(sender)
     }
 }
@@ -537,7 +584,7 @@ extension AlertController: UIViewControllerAnimatedTransitioning {
     
     func createCoverView(_ frame: CGRect) -> UIView {
         let coverView = UIView(frame: frame)
-        coverView.backgroundColor = self.coverColor
+        coverView.backgroundColor = UIColor.black.withAlphaComponent(0.4)
         coverView.alpha = 0
         coverView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         return coverView

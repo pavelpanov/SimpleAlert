@@ -6,28 +6,30 @@
 //  Copyright © 2016年 kyohei_ito. All rights reserved.
 //
 
-open class AlertAction {
-    public enum Style {
+@objc
+open class AlertAction : NSObject {
+    @objc public enum AlertActionStyle : Int {
         case `default`
         case ok
         case cancel
         case destructive
+        case twolines
     }
     
-    public init(title: String, style: Style, handler: ((AlertAction?) -> Void)? = nil) {
+    public init(title: String, style: AlertActionStyle, handler: ((AlertAction?) -> Void)? = nil) {
         self.title = title
         self.handler = handler
         self.style = style
     }
     
-    public convenience init(title: String, style: Style, dismissesAlert: Bool, handler: ((AlertAction?) -> Void)? = nil) {
+    public convenience init(title: String, style: AlertActionStyle, dismissesAlert: Bool, handler: ((AlertAction?) -> Void)? = nil) {
         self.init(title: title, style: style, handler: handler)
         self.dismissesAlert = dismissesAlert
     }
     
     var title: String
     var handler: ((AlertAction) -> Void)?
-    var style: Style
+    var style: AlertActionStyle
     var dismissesAlert = true
     open var enabled: Bool = true {
         didSet {
@@ -35,10 +37,18 @@ open class AlertAction {
         }
     }
     open fileprivate(set) var button: UIButton!
+    open fileprivate(set) var label: UILabel!
     
+    @nonobjc
     func setButton(_ forButton: UIButton) {
         button = forButton
-        button.setTitle(title, for: UIControlState())
         button.isEnabled = enabled
+    }
+
+    @nonobjc
+    func setLabel(_ forTextLabel: UILabel) {
+        label = forTextLabel
+        let att = NSAttributedString(string: title)
+        label.attributedText = att
     }
 }
